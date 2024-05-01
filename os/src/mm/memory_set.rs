@@ -253,6 +253,45 @@ impl MemorySet {
         }
         memory_set
     }
+    // /// 创建一个新的用于用户的地址空间
+    // pub fn new_user() -> Self{
+    //     let mut memory_set = Self::new_bare();
+    //     // map trampoline
+    //     memory_set.map_trampoline();
+    //     // map user stack with U flags
+    //     let user_stack_bottom = USER_STACK_SIZE;
+    //     let user_stack_top = user_stack_bottom + USER_STACK_SIZE;
+    //     memory_set.push(
+    //         MapArea::new(
+    //             user_stack_bottom.into(),
+    //             user_stack_top.into(),
+    //             MapType::Framed,
+    //             MapPermission::R | MapPermission::W | MapPermission::U,
+    //         ),
+    //         None,
+    //     );
+    //     // used in sbrk
+    //     memory_set.push(
+    //         MapArea::new(
+    //             user_stack_top.into(),
+    //             user_stack_top.into(),
+    //             MapType::Framed,
+    //             MapPermission::R | MapPermission::W | MapPermission::U,
+    //         ),
+    //         None,
+    //     );
+    //     // map TrapContext
+    //     memory_set.push(
+    //         MapArea::new(
+    //             TRAP_CONTEXT_BASE.into(),
+    //             TRAMPOLINE.into(),
+    //             MapType::Framed,
+    //             MapPermission::R | MapPermission::W,
+    //         ),
+    //         None,
+    //     );
+    //     memory_set
+    // }
     /// Change page table by writing satp CSR Register.
     pub fn activate(&self) {
         let satp = self.page_table.token();
@@ -299,6 +338,25 @@ impl MemorySet {
         } else {
             false
         }
+    }
+    ///检查memory area是否和某个VPNRange有重叠
+    pub fn check_overlap(&self, vpn_start: VirtPageNum, vpn_end: VirtPageNum) -> bool {
+        let vpn_range = VPNRange::new(vpn_start, vpn_end);
+        self.areas
+            .iter()
+            .any(|area| vpn_range.is_overlap(&area.vpn_range))
+    }
+    /// unmap a virtual page number and delete the maparea
+    #[allow(unused)]
+    pub fn unmap(&mut self, vpn_start: VirtPageNum, vpn_end: VirtPageNum) {
+        for vpn in vpn_start.0..vpn_end.0 {
+            self.page_table.unmap(VirtPageNum(vpn));
+        }
+        let vpn_range = VPNRange::new(vpn_start, vpn_end);
+        self.areas.retain(|area| {
+            //area的vpn_range是个迭代器，只需要判断[vpn_start,vpn_end]是否与vpn_range有交集即可
+            !vpn_range.is_overlap(&area.vpn_range)
+        });
     }
 }
 /// map area structure, controls a contiguous piece of virtual memory
