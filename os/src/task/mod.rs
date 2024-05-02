@@ -22,7 +22,7 @@ mod switch;
 #[allow(rustdoc::private_intra_doc_links)]
 mod task;
 
-use crate::fs::{open_file, OpenFlags};
+use crate::{fs::{open_file, OpenFlags}, syscall::TASK_INFO_LIST};
 use alloc::sync::Arc;
 pub use context::TaskContext;
 use lazy_static::*;
@@ -46,6 +46,16 @@ pub fn suspend_current_and_run_next() {
     let task_cx_ptr = &mut task_inner.task_cx as *mut TaskContext;
     // Change status to Ready
     task_inner.task_status = TaskStatus::Ready;
+    // 为了记录，这里需要同时更新全局变量的任务状态
+    let mut task_info_list = TASK_INFO_LIST.exclusive_access();
+    let next = task.pid.0;
+    task_info_list
+        .get_mut(&next)
+        .unwrap()
+        .set_status(TaskStatus::Ready);
+    //切记drop
+    drop(task_info_list);
+
     drop(task_inner);
     // ---- release current PCB
 
@@ -76,6 +86,12 @@ pub fn exit_current_and_run_next(exit_code: i32) {
     let mut inner = task.inner_exclusive_access();
     // Change status to Zombie
     inner.task_status = TaskStatus::Zombie;
+    // 为了记录，这里需要同时更新全局变量的任务状态
+    let mut task_info_list = TASK_INFO_LIST.exclusive_access();
+    task_info_list.get_mut(&pid).unwrap().set_status(TaskStatus::Zombie);
+    //切记drop
+    drop(task_info_list);
+    
     // Record exit code
     inner.exit_code = exit_code;
     // do not move to its parent but under initproc
