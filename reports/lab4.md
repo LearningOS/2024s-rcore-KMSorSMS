@@ -22,7 +22,7 @@
 
 写在博客里面了：
 
-[rcore-lab6](https://liamy.clovy.top/article/OS_Tutorial/lab6)
+[rcore-lab4](https://liamy.clovy.top/article/OS_Tutorial/lab6)
 
 ## 简答作业
 
